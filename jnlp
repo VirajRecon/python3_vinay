@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+
+from xml.dom.minidom import parse
+from xml.parsers.expat import ExpatError
+import urllib.request as request
+import datetime
+import time
+import sys
+import os
+
+#proxy_support = request.ProxyHandler({'http': '192.168.1.37:8080', 'https': '192.168.1.37:8080'})
+#opener = request.build_opener(proxy_support)
+#request.install_opener(opener)
+
+st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d_%H_%M_%S')
+dirname = "jars_" + st
+os.mkdir(dirname)
+
+to_download = []
+version = []
+try:
+    dom = parse(sys.argv[1])
+except ExpatError as strerror:
+    print("Parsing error -- "+str(strerror))
+    sys.exit(1)
+jnlp = dom.getElementsByTagName("jnlp")
+codebase = jnlp[0].getAttribute("codebase")
+resources = dom.getElementsByTagName("resources")
+
+for resource in resources:
+    jar = resource.getElementsByTagName("jar")
+    for attributes in jar:
+        url = attributes.getAttribute("href")
+        version = attributes.getAttribute("version")
+        if version:
+            link = url + "?version-id=" + version
+        else:
+            link = url
+        to_download.append(link)
+
+for url in to_download:
+    try:
+        print("+ Attempting to fetch " + codebase+url)
+        name = url.split('/')[-1]
+        name = name.split('?')
+        request.urlretrieve(codebase+url, dirname+"/"+name[0])
+        print("+ " + name[0] + " -> Done")
+
+    except IOError as strerror:
+        print("!! Failed -- " + str(strerror))
+        print("Failed File = " + name[0])
+        continue
+    except KeyboardInterrupt:
+        sys.exit(0)
+
+if os.path.isdir(dirname):
+    if not os.listdir(dirname):
+        print("Directory is empty")
+        time.sleep(5)
+        print("Deleting it")
+        os.rmdir(dirname)
+    else:    
+        print("Directory is not empty")
+else:
+    print("Given directory doesn't exist")
